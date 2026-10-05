@@ -266,9 +266,32 @@ class SentryGrid:
 # Q4 贪心导航（题面 Q4·单步贪心导航策略）
 # ---------------------------------------------------------------------------
 def next_step_toward(pos, target, obstacles, current_facing=Facing.UP):
-    """TODO(Q4)：返回下一步应朝向的 Facing；
-    候选判定、优先级与回退规则见题面 Q4 规范。"""
-    raise NotImplementedError("Q4 next_step_toward：题面 Q4·贪心策略与回退")
+    """返回下一步应朝向的 Facing。
+
+    候选方向：相邻格不是障碍、且移动到该格后到目标的曼哈顿距离严格减小；
+    多候选时先走与目标坐标差较大的轴；无候选时返回 current_facing。
+    本函数不感知地图边界。
+    """
+    dx = target[0] - pos[0]
+    dy = target[1] - pos[1]
+    dist = abs(dx) + abs(dy)
+    candidates = []
+    if dx != 0:
+        candidates.append((abs(dx), 0,
+                           Facing.RIGHT if dx > 0 else Facing.LEFT))
+    if dy != 0:
+        candidates.append((abs(dy), 1,
+                           Facing.UP if dy > 0 else Facing.DOWN))
+    # 坐标差较大的轴优先；平局时 x 轴优先。
+    candidates.sort(key=lambda item: (-item[0], item[1]))
+    for _, _, facing in candidates:
+        d = facing.delta
+        nxt = (pos[0] + d[0], pos[1] + d[1])
+        if nxt in obstacles:
+            continue
+        if abs(nxt[0] - target[0]) + abs(nxt[1] - target[1]) < dist:
+            return facing
+    return current_facing
 # ---------------------------------------------------------------------------
 # Q5 哨兵决策机（题面 Q5·裁判系统决策规则表）
 # ---------------------------------------------------------------------------
