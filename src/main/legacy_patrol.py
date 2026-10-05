@@ -78,7 +78,7 @@ def summarize_events(events, max_id):
     used = 0
     steps = 0
     for e in events:
-        if e["id"] < max_id:
+        if e["id"] <= max_id:
             used += 1
             steps += e["move"] + calibrate(e["samples"])
     return {"events": used, "steps": steps}
