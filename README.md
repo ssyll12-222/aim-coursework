@@ -68,3 +68,13 @@ python main.py
 
 CI 只允许修改 `src/main/**`、`README.md` 与 `.agent-sessions/**`（AI 会话归档）——其余文件改了直接红；autopep8 `--diff` 非空即败。提交方式（push、问卷、commit 粒度）见题面"提交与验收"一节。
 
+## Q7 修复分析（你来写）
+
+`src/main/legacy_patrol.py` 共 6 处缺陷，全部以各函数 docstring 契约为基准定位与修复：
+
+1. **`total_route_meters`：单位混淆。** `segment_length_cm` 返回厘米，累加后未除以 100 就当"米"返回，结果放大 100 倍。定位：可见测试期望 `[(0,0),(3,0),(3,4)]` 得到 7，实得 700，对照 docstring"单位：米"。
+2. **`calibrate`：无正样本时崩溃。** `first_positive` 没有正数时返回 `None`，随后 `s - baseline` 抛 `TypeError`，与契约"样本为空或没有正样本时漂移为 0"矛盾。修复：`baseline is None` 时直接返回 0。定位：`test_calibrate_no_positive`。
+3. **`log`：可变默认参数。** `history=[]` 在函数定义时只创建一次，多次调用共享同一个列表，违反"不显式传入时每次从空历史开始"。修复：默认 `None`，函数体内新建列表。定位：`test_log_default_history_independent` 中连续调用结果互相污染。
+4. **`summarize_events`：边界漏统计。** 契约是"id **不超过** max_id"，代码写成 `e["id"] < max_id`，恰等于 max_id 的事件被漏掉，应为 `<=`。定位：`test_summarize_includes_max_id`。
+5. **`run_legacy_sim`：死循环。** 循环变量 `round_` 从不自增，`while round_ < rounds` 恒真——这就是题目背景里"有的调用甚至卡死"的来源。定位：直接读循环体，发现没有任何语句修改 `round_`。
+6. **`run_legacy_sim`：终止条件写反。** 契约是"任一轮结束后体力 <= 20 时立即终止"，代码写成 `if stamina > 20: break`，方向恰好相反：体力充足反而第一轮就退出。它与第 5 处互相遮蔽——死循环不修，根本观察不到这条；这也正是 git log 里那次标注 fix、实际改错方向的提交。定位：修复死循环后用 `test_sim_basic_run` / `test_sim_stops_at_threshold` 对拍 trace。
