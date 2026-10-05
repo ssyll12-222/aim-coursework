@@ -305,10 +305,82 @@ class SentryState(Enum):
     RETURN = "RETURN"
 
 
+_RETREAT_HP_PCT = 30    # R1：血量百分比不高于此值必须撤退
+_SAFE_HP_PCT = 80       # R2：撤退中恢复到此值以上视为安全
+_ENGAGE_DIST = 3        # R4/R6：敌距不超过此值开火
+
+
+def _normalize_sensor(sensor):
+    """校验 sensor 契约并规范化字段；契约外输入 raise ValueError。"""
+    if not isinstance(sensor, dict):
+        raise ValueError("sensor 必须是 dict")
+    missing = {"enemy_frames", "enemy_dist",
+               "robot_type", "max_hp"} - set(sensor)
+    if missing:
+        raise ValueError("sensor 缺少字段: {}".format(sorted(missing)))
+    frames = sensor["enemy_frames"]
+    if not isinstance(frames, (tuple, list)) or not 1 <= len(frames) <= 6:
+        raise ValueError("enemy_frames 必须是长度 1-6 的 tuple/list")
+    frames = [bool(f) for f in frames]
+    dist = sensor["enemy_dist"]
+    if not isinstance(dist, int) or isinstance(dist, bool) or dist < 0:
+        dist = None
+    robot_type = sensor["robot_type"]
+    if robot_type not in ("INFANTRY", "HERO"):
+        robot_type = "INFANTRY"
+    return frames, dist, robot_type
+
+
+def _engage_action(dist, robot_type):
+    """R4/R6 共用：交火中的动作选择。"""
+    if dist is not None and dist <= _ENGAGE_DIST:
+        return "SHOOT"
+    return "MOVE_RIGHT" if robot_type == "HERO" else "MOVE_LEFT"
+
+
 def decide(sensor, state, hp, heat):
-    """TODO(Q5)：纯函数决策，返回 (action: str, new_state: SentryState)；
-    sensor 字段契约、R1-R7 规则表与非法输入处理见题面 Q5 规范。"""
-    raise NotImplementedError("Q5 decide：题面 Q5·决策规则表 R1-R7")
+    """纯函数决策：按 R1-R7 顺序求值，首条命中即返回 (action, new_state)。"""
+    if not isinstance(state, SentryState):
+        raise ValueError("state 必须是 SentryState 成员")
+    frames, dist, robot_type = _normalize_sensor(sensor)
+    max_hp = sensor["max_hp"]
+    hp_pct = hp_ratio(hp, max_hp)
+    visible = frames[-1]
+
+    # R1（保命优先）
+    if hp_pct <= _RETREAT_HP_PCT:
+        return ("RETREAT", SentryState.RETREAT)
+    # R2（撤退保持）
+    if state is SentryState.RETREAT:
+        if hp_pct >= _SAFE_HP_PCT:
+            return ("RETURN", SentryState.RETURN)
+        return ("RETREAT", SentryState.RETREAT)
+    # R3（返航单帧）
+    if state is SentryState.RETURN:
+        return ("MOVE_BASE", SentryState.PATROL)
+    if state is SentryState.ENGAGE:
+        if visible:
+            # R4（交火决策）
+            return (_engage_action(dist, robot_type), SentryState.ENGAGE)
+        # R5（交火保持）：统计末尾连续丢失帧数
+        lost = 0
+        for seen in reversed(frames):
+            if seen:
+                break
+            lost += 1
+        if lost <= 1:
+            return ("HOLD_FIRE", SentryState.ENGAGE)
+        return ("SCAN", SentryState.SUSPECT)
+    # PATROL / SUSPECT
+    if visible:
+        # R6（敌情确认）：末两位均为真才转入交火
+        if len(frames) >= 2 and frames[-2]:
+            return (_engage_action(dist, robot_type), SentryState.ENGAGE)
+        return ("SCAN", SentryState.SUSPECT)
+    # R7（默认行为）
+    if state is SentryState.PATROL:
+        return ("PATROL_MOVE", SentryState.PATROL)
+    return ("SCAN", SentryState.SUSPECT)
 # ---------------------------------------------------------------------------
 # Q6 巡逻任务（题面 Q6·巡逻契约与验收阈值）
 # ---------------------------------------------------------------------------
