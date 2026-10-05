@@ -12,6 +12,7 @@
 - `python main.py`（或 PYTHONPATH=src python -m main）可看 ASCII 演示。
 """
 import json
+from collections import deque
 from enum import Enum
 # ---------------------------------------------------------------------------
 # 仿真世界基础（已提供，勿改）
@@ -397,11 +398,14 @@ def _border_ring(width, height):
 
 
 def run_patrol(grid, max_steps=500):
-    """sense → decide → act 主循环：贪心导航 + 沿墙脱困。
+    """sense → decide → act 主循环：贪心导航 + 沿墙脱困 + BFS 兜底。
 
     终止：抵达 enemy_pos / 步数用尽 / 电量耗尽。
-    脱困：贪心无候选时切入沿墙模式（默认左手规则），距离重新可缩短时
-    切回贪心；沿墙超过一圈未脱困则换手，两圈仍未脱困则强制退出沿墙。
+    脱困分两层：
+    1. 贪心无候选时切入沿墙模式（左右手规则），距离重新可缩短时切回贪心；
+       沿墙超过一圈未脱困则换手，两圈后强制退出，再次入墙时换另一只手；
+    2. 全局看门狗：长时间没有刷新"离目标最近距离"说明陷入循环，
+       此后按 BFS 距离场（对 enemy 的一次反向 BFS）逐步逼近，保证连通图必达。
     """
     enemy = grid.enemy_pos
     blocked_cells = set(grid.obstacles) | _border_ring(grid.width,
@@ -421,6 +425,17 @@ def run_patrol(grid, max_steps=500):
         d = facing.delta
         return (pos[0] + d[0], pos[1] + d[1])
 
+    # 以 enemy 为源做一次反向 BFS，得到每个格到 enemy 的真实最短路长度。
+    dist_field = {enemy: 0}
+    queue = deque([enemy])
+    while queue:
+        cx, cy = queue.popleft()
+        for nxt in ((cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)):
+            if blocked(nxt) or nxt in dist_field:
+                continue
+            dist_field[nxt] = dist_field[(cx, cy)] + 1
+            queue.append(nxt)
+
     def greedy_dir(pos):
         direction = next_step_toward(pos, enemy, blocked_cells, grid.facing)
         nxt = cell_from(pos, direction)
@@ -429,6 +444,17 @@ def run_patrol(grid, max_steps=500):
         if manhattan(nxt, enemy) >= manhattan(pos, enemy):
             return None
         return direction
+
+    def bfs_dir(pos):
+        best_dir, best_len = None, None
+        for f in (Facing.UP, Facing.DOWN, Facing.LEFT, Facing.RIGHT):
+            nxt = cell_from(pos, f)
+            length = dist_field.get(nxt)
+            if length is None:
+                continue
+            if best_len is None or length < best_len:
+                best_dir, best_len = f, length
+        return best_dir
 
     def align(target):
         rights = {Facing.UP: 0, Facing.RIGHT: 1,
@@ -446,16 +472,30 @@ def run_patrol(grid, max_steps=500):
     hand = "L"
     wall_steps = 0
     entry = 0
+    best = manhattan(grid.current_pos, enemy)
+    last_progress = 0
+    bfs_mode = False
     while steps < max_steps and grid.fuel > 0 and not grid.found_enemy:
         pos = grid.current_pos
         visited.add(pos)
-        if not wall:
+        dist_now = manhattan(pos, enemy)
+        if dist_now < best:
+            best = dist_now
+            last_progress = steps
+        if not bfs_mode and steps - last_progress > limit // 2:
+            bfs_mode = True
+            wall = False
+        if bfs_mode:
+            direction = bfs_dir(pos)
+            if direction is None:
+                break  # 目标不可达（正常不会发生：生成器保证连通）
+            align(direction)
+        elif not wall:
             direction = greedy_dir(pos)
             if direction is None:
                 wall = True
-                hand = "L"
                 wall_steps = 0
-                entry = manhattan(pos, enemy)
+                entry = dist_now
             else:
                 align(direction)
         if wall:
@@ -476,8 +516,9 @@ def run_patrol(grid, max_steps=500):
             wall_steps += 1
             if wall_steps > 2 * limit:
                 wall = False
-            elif wall_steps > limit and hand == "L":
-                hand = "R"
+                hand = "R" if hand == "L" else "L"  # 下次入墙换手
+            elif wall_steps > limit:
+                hand = "R" if hand == "L" else "L"
                 wall_steps = 0
             elif (greedy_dir(grid.current_pos) is not None
                     and manhattan(grid.current_pos, enemy) < entry):
@@ -489,6 +530,11 @@ def run_patrol(grid, max_steps=500):
             "visited_count": len(visited),
             "found_enemy": found,
             "success": found}
+
+
+def report_to_json(stats):
+    """把 stats 序列化为确定性的 JSON 字符串（键排序）。"""
+    return json.dumps(stats, sort_keys=True)
 # ---------------------------------------------------------------------------
 # Bonus：BFS 全局最短路（题面 Bonus·BFS 语义与排行榜）
 # ---------------------------------------------------------------------------
