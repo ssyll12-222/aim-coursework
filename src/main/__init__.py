@@ -55,10 +55,92 @@ def status_report(name, robot_type, hp, max_hp, battery):
 # ---------------------------------------------------------------------------
 # Q2 战斗日志分析（题面 Q2·多源日志解析与统计）
 # ---------------------------------------------------------------------------
+_ARMOR_KEYS = ("front", "left", "right")
+_SENSOR_KEYS = {"F": "front", "L": "left", "R": "right"}
+
+
+def _parse_sensor_line(line):
+    """解析 "F:32,L:5,R:12" 形式的传感器行；非法返回 None。"""
+    hits = {}
+    for seg in line.split(","):
+        seg = seg.strip()
+        if ":" not in seg:
+            return None
+        key, _, value = seg.partition(":")
+        key = key.strip()
+        value = value.strip()
+        if key not in _SENSOR_KEYS or not value.isdigit():
+            return None
+        damage = int(value)
+        if damage <= 0:
+            return None
+        hits[_SENSOR_KEYS[key]] = hits.get(_SENSOR_KEYS[key], 0) + damage
+    return hits or None
+
+
+def _parse_json_line(line):
+    """解析 JSON 伤害行；非法返回 None。合法返回 (armor, damage, id|_NO_ID)。"""
+    try:
+        obj = json.loads(line)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(obj, dict):
+        return None
+    armor = obj.get("armor")
+    damage = obj.get("damage")
+    if armor not in _ARMOR_KEYS:
+        return None
+    if not isinstance(damage, int) or isinstance(damage, bool) or damage <= 0:
+        return None
+    return armor, damage, obj.get("id", _NO_ID)
+
+
+class _NoId:
+    pass
+
+
+_NO_ID = _NoId()
+
+
 def analyze_damage_log(lines):
-    """TODO(Q2)：解析混合格式伤害日志，返回固定契约的统计 dict；
-    行格式、去重与统计口径见题面 Q2 规范。"""
-    raise NotImplementedError("Q2 analyze_damage_log：题面 Q2·多源日志解析与统计")
+    """解析混合格式伤害日志，返回固定契约的统计 dict。"""
+    total = 0
+    events = 0
+    by_armor = {"front": 0, "left": 0, "right": 0}
+    seen_ids = set()
+    for line in lines:
+        if not isinstance(line, str):
+            continue
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        parsed = _parse_json_line(stripped)
+        if parsed is not None:
+            armor, damage, event_id = parsed
+            if event_id is not _NO_ID:
+                try:
+                    if event_id in seen_ids:
+                        continue
+                    seen_ids.add(event_id)
+                except TypeError:
+                    continue
+            by_armor[armor] += damage
+            total += damage
+            events += 1
+            continue
+        hits = _parse_sensor_line(stripped)
+        if hits is not None:
+            for armor, damage in hits.items():
+                by_armor[armor] += damage
+                total += damage
+            events += 1
+    most_hit = None
+    if events:
+        most_hit = max(_ARMOR_KEYS, key=lambda a: by_armor[a])
+    return {"total": total,
+            "by_armor": by_armor,
+            "most_hit": most_hit,
+            "avg": round(total / events, 2) if events else 0.0}
 # ---------------------------------------------------------------------------
 # Q3 SentryGrid（题面 Q3·载体物理规则）
 # ---------------------------------------------------------------------------
