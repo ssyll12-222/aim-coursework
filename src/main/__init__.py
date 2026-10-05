@@ -14,6 +14,8 @@
 import json
 from collections import deque
 from enum import Enum
+
+
 # ---------------------------------------------------------------------------
 # 仿真世界基础（已提供，勿改）
 # ---------------------------------------------------------------------------
@@ -29,6 +31,8 @@ class Facing(Enum):
     def delta(self):
         """该朝向的单位位移向量 (dx, dy)。"""
         return self.value[0], self.value[1]
+
+
 # ---------------------------------------------------------------------------
 # Q1 机器人自检（题面 Q1·自检状态计算与报告生成）
 # ---------------------------------------------------------------------------
@@ -53,6 +57,8 @@ def status_report(name, robot_type, hp, max_hp, battery):
     return "{name:<10}|{rtype:^10}|HP {hp:>3}%|BAT {bat:>3}%|{lvl}".format(
         name=name, rtype=robot_type, hp=hp_ratio(hp, max_hp),
         bat=battery, lvl=level)
+
+
 # ---------------------------------------------------------------------------
 # Q2 战斗日志分析（题面 Q2·多源日志解析与统计）
 # ---------------------------------------------------------------------------
@@ -142,6 +148,8 @@ def analyze_damage_log(lines):
             "by_armor": by_armor,
             "most_hit": most_hit,
             "avg": round(total / events, 2) if events else 0.0}
+
+
 # ---------------------------------------------------------------------------
 # Q3 SentryGrid（题面 Q3·载体物理规则）
 # ---------------------------------------------------------------------------
@@ -263,6 +271,8 @@ class SentryGrid:
                     Facing.DOWN: Facing.LEFT, Facing.LEFT: Facing.UP}
         self._facing = right_of[self._facing]
         return self._facing
+
+
 # ---------------------------------------------------------------------------
 # Q4 贪心导航（题面 Q4·单步贪心导航策略）
 # ---------------------------------------------------------------------------
@@ -293,6 +303,8 @@ def next_step_toward(pos, target, obstacles, current_facing=Facing.UP):
         if abs(nxt[0] - target[0]) + abs(nxt[1] - target[1]) < dist:
             return facing
     return current_facing
+
+
 # ---------------------------------------------------------------------------
 # Q5 哨兵决策机（题面 Q5·裁判系统决策规则表）
 # ---------------------------------------------------------------------------
@@ -382,6 +394,8 @@ def decide(sensor, state, hp, heat):
     if state is SentryState.PATROL:
         return ("PATROL_MOVE", SentryState.PATROL)
     return ("SCAN", SentryState.SUSPECT)
+
+
 # ---------------------------------------------------------------------------
 # Q6 巡逻任务（题面 Q6·巡逻契约与验收阈值）
 # ---------------------------------------------------------------------------
@@ -535,12 +549,37 @@ def run_patrol(grid, max_steps=500):
 def report_to_json(stats):
     """把 stats 序列化为确定性的 JSON 字符串（键排序）。"""
     return json.dumps(stats, sort_keys=True)
+
+
 # ---------------------------------------------------------------------------
 # Bonus：BFS 全局最短路（题面 Bonus·BFS 语义与排行榜）
 # ---------------------------------------------------------------------------
 def bfs_path_length(start, target, obstacles):
-    """TODO(Bonus)：BFS 全局最短路步数；返回语义与边界职责见题面 Bonus 规范。"""
-    raise NotImplementedError("Bonus bfs_path_length")
+    """BFS 全局最短路步数：start == target 返回 0；不可达返回 -1。
+
+    obstacles 由调用方负责包含地图边界。
+    """
+    start = (int(start[0]), int(start[1]))
+    target = (int(target[0]), int(target[1]))
+    if start == target:
+        return 0
+    blocked = set(obstacles)
+    if start in blocked or target in blocked:
+        return -1
+    queue = deque([(start, 0)])
+    seen = {start}
+    while queue:
+        (x, y), dist = queue.popleft()
+        for nxt in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+            if nxt in blocked or nxt in seen:
+                continue
+            if nxt == target:
+                return dist + 1
+            seen.add(nxt)
+            queue.append((nxt, dist + 1))
+    return -1
+
+
 # ---------------------------------------------------------------------------
 # 渲染（已提供，demo 专用，不进测试）
 # ---------------------------------------------------------------------------
