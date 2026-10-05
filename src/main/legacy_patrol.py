@@ -31,7 +31,7 @@ def total_route_meters(points):
     distance_in_meters = 0
     for i in range(len(points) - 1):
         distance_in_meters += segment_length_cm(points[i], points[i + 1])
-    return distance_in_meters / 100
+    return distance_in_meters // 100
 
 
 # ---------------------------------------------------------------------------
