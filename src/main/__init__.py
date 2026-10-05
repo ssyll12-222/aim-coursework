@@ -1,3 +1,4 @@
+# aim-py-cw
 # -*- coding: utf-8 -*-
 """AIM 2627 Python Coursework —— 哨兵 Sentry 控制模块（学生骨架）。
 
@@ -12,8 +13,6 @@
 """
 import json
 from enum import Enum
-
-
 # ---------------------------------------------------------------------------
 # 仿真世界基础（已提供，勿改）
 # ---------------------------------------------------------------------------
@@ -29,21 +28,30 @@ class Facing(Enum):
     def delta(self):
         """该朝向的单位位移向量 (dx, dy)。"""
         return self.value[0], self.value[1]
-
-
 # ---------------------------------------------------------------------------
 # Q1 机器人自检（题面 Q1·自检状态计算与报告生成）
 # ---------------------------------------------------------------------------
 def hp_ratio(hp, max_hp):
-    """TODO(Q1)：血量百分比，返回 0-100 的 int；计算与边界规则见题面 Q1 规范。"""
-    raise NotImplementedError("Q1 hp_ratio：题面 Q1·血量百分比与精度保障")
+    """血量百分比，返回 0-100 的 int。"""
+    try:
+        ratio = int(round(100.0 * hp / max_hp))
+    except (TypeError, ZeroDivisionError):
+        return 0
+    return max(0, min(100, ratio))
 
 
 def status_report(name, robot_type, hp, max_hp, battery):
-    """TODO(Q1)：一行自检报告字符串；档位判定与逐字符格式见题面 Q1 规范。"""
-    raise NotImplementedError("Q1 status_report：题面 Q1·电量映射与报告格式")
-
-
+    """一行自检报告字符串：名称|机型|HP|电量|档位。"""
+    battery = int(battery)
+    if battery >= 50:
+        level = "OK"
+    elif battery >= 20:
+        level = "WARNING"
+    else:
+        level = "LOW"
+    return "{name:<10}|{rtype:^10}|HP {hp:>3}%|BAT {bat:>3}%|{lvl}".format(
+        name=name, rtype=robot_type, hp=hp_ratio(hp, max_hp),
+        bat=battery, lvl=level)
 # ---------------------------------------------------------------------------
 # Q2 战斗日志分析（题面 Q2·多源日志解析与统计）
 # ---------------------------------------------------------------------------
@@ -51,8 +59,6 @@ def analyze_damage_log(lines):
     """TODO(Q2)：解析混合格式伤害日志，返回固定契约的统计 dict；
     行格式、去重与统计口径见题面 Q2 规范。"""
     raise NotImplementedError("Q2 analyze_damage_log：题面 Q2·多源日志解析与统计")
-
-
 # ---------------------------------------------------------------------------
 # Q3 SentryGrid（题面 Q3·载体物理规则）
 # ---------------------------------------------------------------------------
@@ -154,8 +160,6 @@ class SentryGrid:
     def turn_right(self):
         """TODO(Q3)：原地右转 90°，返回新的 Facing（不耗电）。"""
         raise NotImplementedError("Q3 turn_right")
-
-
 # ---------------------------------------------------------------------------
 # Q4 贪心导航（题面 Q4·单步贪心导航策略）
 # ---------------------------------------------------------------------------
@@ -163,8 +167,6 @@ def next_step_toward(pos, target, obstacles, current_facing=Facing.UP):
     """TODO(Q4)：返回下一步应朝向的 Facing；
     候选判定、优先级与回退规则见题面 Q4 规范。"""
     raise NotImplementedError("Q4 next_step_toward：题面 Q4·贪心策略与回退")
-
-
 # ---------------------------------------------------------------------------
 # Q5 哨兵决策机（题面 Q5·裁判系统决策规则表）
 # ---------------------------------------------------------------------------
@@ -182,8 +184,6 @@ def decide(sensor, state, hp, heat):
     """TODO(Q5)：纯函数决策，返回 (action: str, new_state: SentryState)；
     sensor 字段契约、R1-R7 规则表与非法输入处理见题面 Q5 规范。"""
     raise NotImplementedError("Q5 decide：题面 Q5·决策规则表 R1-R7")
-
-
 # ---------------------------------------------------------------------------
 # Q6 巡逻任务（题面 Q6·巡逻契约与验收阈值）
 # ---------------------------------------------------------------------------
@@ -196,16 +196,12 @@ def run_patrol(grid, max_steps=500):
 def report_to_json(stats):
     """TODO(Q6)：把 stats 序列化为确定性的 JSON 字符串，见题面 Q6 规范。"""
     raise NotImplementedError("Q6 report_to_json：题面 Q6·报告序列化")
-
-
 # ---------------------------------------------------------------------------
 # Bonus：BFS 全局最短路（题面 Bonus·BFS 语义与排行榜）
 # ---------------------------------------------------------------------------
 def bfs_path_length(start, target, obstacles):
     """TODO(Bonus)：BFS 全局最短路步数；返回语义与边界职责见题面 Bonus 规范。"""
     raise NotImplementedError("Bonus bfs_path_length")
-
-
 # ---------------------------------------------------------------------------
 # 渲染（已提供，demo 专用，不进测试）
 # ---------------------------------------------------------------------------
