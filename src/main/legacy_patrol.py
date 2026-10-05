@@ -114,6 +114,7 @@ def run_legacy_sim(rounds, stamina_start=100):
         if round_ >= 3:
             stamina -= 5
         trace.append((round_, stamina))
-        if stamina > 20:
+        round_ += 1
+        if stamina <= 20:
             break
     return {"rounds": len(trace), "stamina": stamina, "trace": trace}
