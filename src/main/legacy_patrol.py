@@ -1,3 +1,4 @@
+# aim-py-cw
 # -*- coding: utf-8 -*-
 """旧版巡逻统计模块（2526 赛季遗留）—— Q7：昨天还能跑。
 
@@ -30,7 +31,7 @@ def total_route_meters(points):
     distance_in_meters = 0
     for i in range(len(points) - 1):
         distance_in_meters += segment_length_cm(points[i], points[i + 1])
-    return distance_in_meters
+    return distance_in_meters / 100
 
 
 # ---------------------------------------------------------------------------
@@ -59,6 +60,8 @@ def calibrate(samples):
     """以第一个正样本为基线计算累计漂移：sum(s - baseline)。
     样本为空或没有正样本时，漂移为 0。"""
     baseline = first_positive(samples)
+    if baseline is None:
+        return 0
     drift = 0
     for s in samples:
         drift += s - baseline
@@ -81,9 +84,11 @@ def summarize_events(events, max_id):
     return {"events": used, "steps": steps}
 
 
-def log(message, history=[]):
+def log(message, history=None):
     """向历史追加一条日志并返回整个历史列表。
     不显式传入 history 时，每次调用都从空历史开始。"""
+    if history is None:
+        history = []
     history.append(message)
     return history
 
